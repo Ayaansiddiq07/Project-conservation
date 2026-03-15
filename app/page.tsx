@@ -2,11 +2,43 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { Cpu, Maximize, Orbit } from "lucide-react";
-import ThreeDModel from "../components/ThreeDModel";
-import TelemetryDashboard from "../components/TelemetryDashboard";
 
+const ThreeDModel = dynamic(() => import("../components/ThreeDModel"), {
+  ssr: false,
+  loading: () => (
+    <section id="interactive">
+      <div className="container" style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 24px' }}>
+        <div className="section-head" style={{ marginBottom: 64 }}>
+          <span className="section-tag">02 / Visualization</span>
+          <h2 className="section-title">3D Prototype Analysis</h2>
+        </div>
+        <div style={{ maxWidth: 900, margin: '0 auto', height: 600, borderRadius: 16, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ color: '#555', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>Loading 3D Model...</span>
+        </div>
+      </div>
+    </section>
+  ),
+});
+
+const TelemetryDashboard = dynamic(() => import("../components/TelemetryDashboard"), {
+  ssr: false,
+  loading: () => (
+    <section id="metrics">
+      <div className="container" style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 24px' }}>
+        <div className="section-head" style={{ marginBottom: 64 }}>
+          <span className="section-tag">03 / Telemetry</span>
+          <h2 className="section-title">Blynk IoT Live Diagnostics</h2>
+        </div>
+        <div style={{ minHeight: 400, borderRadius: 16, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ color: '#555', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>Loading Telemetry...</span>
+        </div>
+      </div>
+    </section>
+  ),
+});
 export default function Home() {
   const [scrolled, setScrolled] = useState(false);
 
@@ -52,7 +84,6 @@ export default function Home() {
 
         <div className="team-grid">
           {[
-            { name: "Sameed", id: "4BP25EC028" },
             { name: "Ahmad A.M.", id: "4BP25IC001" },
             { name: "Ayaan Siddique", id: "4BP25IC001" },
           ].map((member, i) => (
@@ -192,6 +223,7 @@ export default function Home() {
 
       <footer>
         <p>vX.1 PROTOTYPE // OPEN SOURCE HARDWARE IMPLEMENTATION</p>
+        <p style={{ marginTop: 8, fontSize: '0.7rem' }}>© {new Date().getFullYear()} Ayaan Siddique. All Rights Reserved.</p>
       </footer>
     </main>
   );
