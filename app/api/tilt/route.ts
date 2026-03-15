@@ -1,8 +1,37 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
+async function verifyAdmin(): Promise<boolean> {
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret) return false;
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get('admin_token')?.value;
+  if (!token) return false;
+
+  try {
+    const [encoded, hash] = token.split('.');
+    const payload = Buffer.from(encoded, 'base64').toString('utf8');
+    const expectedHash = crypto.createHmac('sha256', adminSecret).update(payload).digest('hex');
+    if (hash !== expectedHash) return false;
+
+    const data = JSON.parse(payload);
+    return data.exp > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: Request) {
+  // Verify admin authentication first
+  const isAdmin = await verifyAdmin();
+  if (!isAdmin) {
+    return NextResponse.json({ error: 'Unauthorized. Admin login required.' }, { status: 401 });
+  }
+
   const blynkToken = process.env.BLYNK_TOKEN;
   
   if (!blynkToken) {
@@ -28,4 +57,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Server error updating tilt.' }, { status: 500 });
   }
 }
+
 
