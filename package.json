@@ -9,12 +9,26 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "@sanity/client": "^7.17.0",
+    "@sanity/image-url": "^2.0.3",
+    "@sanity/ui": "^3.1.13",
+    "@types/three": "^0.183.1",
+    "framer-motion": "^12.36.0",
+    "lucide-react": "^0.577.0",
     "next": "16.1.6",
+    "next-sanity": "^12.1.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "sanity": "^5.16.0",
+    "styled-components": "^6.3.11",
+    "three": "^0.183.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/event-source-polyfill": "^1.0.5",
+    "@types/eventsource": "^1.1.15",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
