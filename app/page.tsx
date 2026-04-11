@@ -1,22 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { motion } from "framer-motion";
-import { Cpu, Maximize, Orbit } from "lucide-react";
+import { Cpu, Maximize, Orbit, Sun, Zap, Radio } from "lucide-react";
+
+/* ─── Dynamic Imports (SSR-safe) ─── */
+const HeroScene = dynamic(() => import("../components/HeroScene"), {
+  ssr: false,
+  loading: () => <div style={{ position: "absolute", inset: 0, background: "#000" }} />,
+});
+
+const AmbientParticles = dynamic(() => import("../components/AmbientParticles"), {
+  ssr: false,
+});
+
+const ScrollEngine = dynamic(() => import("../components/ScrollEngine"), {
+  ssr: false,
+});
 
 const ThreeDModel = dynamic(() => import("../components/ThreeDModel"), {
   ssr: false,
   loading: () => (
     <section id="interactive">
-      <div className="container" style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 24px' }}>
-        <div className="section-head" style={{ marginBottom: 64 }}>
+      <div className="container" style={{ maxWidth: 1100, margin: "0 auto", padding: "100px 24px" }}>
+        <div className="section-head" style={{ marginBottom: 48 }}>
           <span className="section-tag">02 / Visualization</span>
-          <h2 className="section-title">3D Prototype Analysis</h2>
+          <h2 className="section-title">Interactive 3D Prototype</h2>
         </div>
-        <div style={{ maxWidth: 900, margin: '0 auto', height: 600, borderRadius: 16, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ color: '#555', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>Loading 3D Model...</span>
+        <div
+          style={{
+            maxWidth: 900,
+            margin: "0 auto",
+            aspectRatio: "16/10",
+            borderRadius: 16,
+            background: "#030303",
+            border: "1px solid rgba(255,255,255,0.06)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <span style={{ color: "#222", fontFamily: "var(--font-mono)", fontSize: "0.8rem", letterSpacing: "0.05em" }}>
+            INITIALIZING 3D ENGINE...
+          </span>
         </div>
       </div>
     </section>
@@ -27,203 +54,468 @@ const TelemetryDashboard = dynamic(() => import("../components/TelemetryDashboar
   ssr: false,
   loading: () => (
     <section id="metrics">
-      <div className="container" style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 24px' }}>
-        <div className="section-head" style={{ marginBottom: 64 }}>
+      <div className="container" style={{ maxWidth: 1100, margin: "0 auto", padding: "100px 24px" }}>
+        <div className="section-head" style={{ marginBottom: 48 }}>
           <span className="section-tag">03 / Telemetry</span>
           <h2 className="section-title">Blynk IoT Live Diagnostics</h2>
         </div>
-        <div style={{ minHeight: 400, borderRadius: 16, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ color: '#555', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>Loading Telemetry...</span>
+        <div
+          className="glass-panel"
+          style={{ minHeight: 300, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <span style={{ color: "#222", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }}>
+            CONNECTING TO BLYNK...
+          </span>
         </div>
       </div>
     </section>
   ),
 });
+
+/* ─── Card Mouse Glow Handler ─── */
+function useCardGlow() {
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    card.style.setProperty("--mouse-x", `${x}%`);
+    card.style.setProperty("--mouse-y", `${y}%`);
+  }, []);
+  return handleMouseMove;
+}
+
+/* ─── Active Nav Section Detection ─── */
+function useActiveSection() {
+  const [active, setActive] = useState("");
+
+  useEffect(() => {
+    const ids = ["architecture", "interactive", "metrics", "future"];
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActive(entry.target.id);
+          }
+        });
+      },
+      { rootMargin: "-40% 0px -55% 0px" }
+    );
+
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  return active;
+}
+
+/* ─── ARCHITECTURE CARD DATA ─── */
+const ARCH_CARDS = [
+  {
+    icon: Cpu,
+    title: "Central Processing (Dual-MCU)",
+    desc: "Dual-node architecture: An Arduino Uno acts as a current-reduction buffer to protect servo motors from overload, interfaced with an Arduino R4 WiFi for main logic and telemetry transmission.",
+    accent: "#f59e0b",
+  },
+  {
+    icon: Orbit,
+    title: "Actuation Layer",
+    desc: "Two precision SG90 micro servos execute dual-axis adjustments based on algorithmic PID outputs, aligning the panel physically via structural mounts.",
+    accent: "#06b6d4",
+  },
+  {
+    icon: Maximize,
+    title: "Environmental Sensing Array",
+    desc: "A four-quadrant LDR cluster acts as analog optical sensors for differential light comparison, complemented by a DHT11 sensor for ambient climate profiling.",
+    accent: "#4ade80",
+  },
+];
+
+/* ═══════════════════════════════════ */
+/* ─── MAIN PAGE COMPONENT ─── */
+/* ═══════════════════════════════════ */
 export default function Home() {
   const [scrolled, setScrolled] = useState(false);
+  const activeSection = useActiveSection();
+  const cardGlow = useCardGlow();
 
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 50);
     };
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
     <main>
-      <div className="grid-bg"></div>
+      {/* Background layers */}
+      <div className="grain-overlay" />
+      <div className="grid-bg" />
+      <AmbientParticles />
+      <ScrollEngine />
 
-      {/* NAVIGATION */}
+      {/* Scroll progress indicator */}
+      <div className="scroll-progress" />
+
+      {/* ─── NAVIGATION ─── */}
       <nav className={`navbar ${scrolled ? "scrolled" : ""}`} id="navbar">
-        <div className="logo">AERO-SOLAR // vX.1</div>
+        <div className="logo">
+          <span className="logo-dot" />
+          AERO-SOLAR // vX.1
+        </div>
         <ul className="nav-links">
-          <li><a href="#architecture">Architecture</a></li>
-          <li><a href="#interactive">Prototype</a></li>
-          <li><a href="#metrics">Telemetry</a></li>
-          <li><a href="#future">Future Vision</a></li>
+          {[
+            { href: "#architecture", label: "Architecture", id: "architecture" },
+            { href: "#interactive", label: "Prototype", id: "interactive" },
+            { href: "#metrics", label: "Telemetry", id: "metrics" },
+            { href: "#future", label: "Future Vision", id: "future" },
+          ].map((link) => (
+            <li key={link.id}>
+              <a href={link.href} className={activeSection === link.id ? "active" : ""}>
+                {link.label}
+              </a>
+            </li>
+          ))}
         </ul>
       </nav>
 
-      {/* HERO SECTION */}
-      <motion.header 
-        className="hero" id="hero"
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-      >
-        <div className="hero-badge">
-          <span className="dot"></span> SYSTEM ONLINE — TRACKING ACTIVE
+      {/* ─── HERO SECTION ─── */}
+      <header className="hero" id="hero">
+        {/* 3D Background */}
+        <div className="hero-canvas-wrap">
+          <HeroScene />
         </div>
-        <h1>Intelligent Solar Tracking Architecture</h1>
-        <p>
-          A precision-engineered IoT tracking system designed to dynamically align
-          photovoltaic modules with incident sunlight, maximising energy yield via
-          closed-loop feedback and telemetry.
-        </p>
 
-        <div className="team-grid">
-          {[
-            { name: "Ahmad A.M.", id: "4BP25IC001" },
-            { name: "Ayaan Siddique", id: "4BP25IC001" },
-          ].map((member, i) => (
-            <div className="team-member" key={i}>
-              <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#222', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#444' }} />
+        {/* Ambient halos */}
+        <div
+          className="ambient-halo ambient-halo--amber"
+          style={{ top: "10%", right: "5%" }}
+        />
+        <div
+          className="ambient-halo ambient-halo--cyan"
+          style={{ bottom: "15%", left: "10%" }}
+        />
+
+        <div className="hero-content">
+          <div className="hero-badge">
+            <span className="dot" /> SYSTEM ONLINE — TRACKING ACTIVE
+          </div>
+          <h1>Intelligent Solar Tracking Architecture</h1>
+          <p>
+            A precision-engineered IoT tracking system designed to dynamically
+            align photovoltaic modules with incident sunlight, maximising energy
+            yield via closed-loop feedback and telemetry.
+          </p>
+
+          <div className="team-grid">
+            {[
+              { name: "Ahmad A.M.", id: "4BP25IC001" },
+              { name: "Ayaan Siddique", id: "4BP25IC001" },
+            ].map((member, i) => (
+              <div className="team-member" key={i}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, #1a1a1a, #2a2a2a)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      background:
+                        "linear-gradient(135deg, #333, #555)",
+                    }}
+                  />
+                </div>
+                <div className="team-info">
+                  <div className="team-name">{member.name}</div>
+                  <div className="team-id">{member.id}</div>
+                </div>
               </div>
-              <div className="team-info">
-                <div className="team-name">{member.name}</div>
-                <div className="team-id">{member.id}</div>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </motion.header>
+      </header>
 
-      {/* ARCHITECTURE */}
+      {/* ─── ARCHITECTURE ─── */}
       <section id="architecture">
-        <motion.div 
-          className="container" style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 24px' }}
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.7 }}
-        >
-          <div className="section-head" style={{ marginBottom: 64 }}>
+        <div className="container" style={{ maxWidth: 1100, margin: "0 auto", padding: "100px 24px" }}>
+          {/* Ambient glow */}
+          <div
+            className="ambient-halo ambient-halo--amber"
+            style={{ top: "-20%", left: "-15%", opacity: 0.5 }}
+          />
+
+          <div className="section-head" style={{ marginBottom: 56 }}>
             <span className="section-tag">01 / Infrastructure</span>
             <h2 className="section-title">Hardware Topology</h2>
+            <p className="section-desc">
+              Core subsystems powering the solar tracking prototype.
+            </p>
           </div>
 
-          <div className="bento-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-            <div className="card" style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 32 }}>
-              <div className="card-icon"><Cpu size={20} color="#fff" /></div>
-              <h3 style={{ color: '#fff', marginBottom: 12 }}>Central Processing (Dual-MCU)</h3>
-              <p>Dual-node architecture: An Arduino Uno acts as a current-reduction buffer to protect servo motors from overload, interfaced with an Arduino R4 WiFi for main logic and telemetry transmission.</p>
-            </div>
-            <div className="card" style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 32 }}>
-              <div className="card-icon"><Orbit size={20} color="#fff" /></div>
-              <h3 style={{ color: '#fff', marginBottom: 12 }}>Actuation Layer</h3>
-              <p>Two precision SG90 micro servos execute dual-axis adjustments based on algorithmic PID outputs, aligning the panel physically via structural mounts.</p>
-            </div>
-            <div className="card" style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 32 }}>
-              <div className="card-icon"><Maximize size={20} color="#fff" /></div>
-              <h3 style={{ color: '#fff', marginBottom: 12 }}>Environmental Sensing Array</h3>
-              <p>A four-quadrant LDR cluster acts as analog optical sensors for differential light comparison, complemented by a DHT11 sensor for ambient climate profiling.</p>
-            </div>
+          <div className="bento-grid">
+            {ARCH_CARDS.map((card, i) => {
+              const Icon = card.icon;
+              return (
+                <div
+                  key={i}
+                  className="glass-card"
+                  style={{ padding: 28 }}
+                  onMouseMove={cardGlow}
+                >
+                  <div className="card-icon">
+                    <Icon size={20} color="#fff" />
+                  </div>
+                  <h3>{card.title}</h3>
+                  <p className="card-desc">{card.desc}</p>
+                </div>
+              );
+            })}
           </div>
-        </motion.div>
+        </div>
       </section>
 
+      {/* ─── 3D PROTOTYPE VIEWER ─── */}
       <ThreeDModel />
 
+      {/* ─── VIDEO DEMO ─── */}
       <section>
-        <motion.div 
-          className="container" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px' }}
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
-          <div style={{ marginTop: 48, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div className="video-container" style={{ width: '100%', maxWidth: 360, borderRadius: 24, overflow: 'hidden', border: '8px solid #222', boxShadow: '0 20px 40px rgba(0,0,0,0.5)', background: '#000' }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, #1a1a1a 0%, #111 100%)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 8px #ef4444' }}></div>
-                  <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: '#fff', letterSpacing: 1 }}>LIVE DEMO</span>
+        <div className="container sr-scale" style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px" }}>
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div className="video-container" style={{ width: "100%", maxWidth: 380 }}>
+              <div className="video-header">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div className="video-dot" />
+                  <span
+                    style={{
+                      fontSize: "0.7rem",
+                      fontFamily: "var(--font-mono)",
+                      color: "#888",
+                      letterSpacing: "0.08em",
+                    }}
+                  >
+                    LIVE DEMO
+                  </span>
                 </div>
-                <div style={{ width: 40, height: 4, borderRadius: 4, background: '#333' }}></div>
-                <div style={{ width: 24 }}></div>
+                <div style={{ width: 36, height: 3, borderRadius: 3, background: "#222" }} />
+                <div style={{ width: 20 }} />
               </div>
-              <video controls playsInline style={{ width: '100%', display: 'block', maxHeight: 640, objectFit: 'cover', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}>
+              <video
+                controls
+                playsInline
+                style={{
+                  width: "100%",
+                  display: "block",
+                  maxHeight: 640,
+                  objectFit: "cover",
+                }}
+              >
                 <source src="/assets/prototype_demo.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
             </div>
-            <p style={{ color: '#555', fontSize: '0.85rem', marginTop: 16, textAlign: 'center', maxWidth: 400 }}>
-              Working hardware prototype showing the dual-axis automated alignment and data transmission to the IoT dashboard.
+            <p
+              style={{
+                color: "#444",
+                fontSize: "0.8rem",
+                marginTop: 16,
+                textAlign: "center",
+                maxWidth: 400,
+                lineHeight: 1.6,
+              }}
+            >
+              Working hardware prototype showing dual-axis automated alignment
+              and data transmission to the IoT dashboard.
             </p>
           </div>
-        </motion.div>
+        </div>
       </section>
 
+      {/* ─── TELEMETRY DASHBOARD ─── */}
       <TelemetryDashboard />
 
-      {/* FUTURE VISION */}
+      {/* ─── FUTURE VISION ─── */}
       <section id="future">
-        <motion.div 
-          className="container" style={{ maxWidth: 900, margin: '0 auto', padding: '120px 24px' }}
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.8 }}
-        >
-          <div className="section-head" style={{ marginBottom: 64 }}>
+        <div className="container" style={{ maxWidth: 900, margin: "0 auto", padding: "100px 24px" }}>
+          {/* Ambient glow */}
+          <div
+            className="ambient-halo ambient-halo--cyan"
+            style={{ top: "0%", right: "-20%", opacity: 0.4 }}
+          />
+
+          <div className="section-head" style={{ marginBottom: 56 }}>
             <span className="section-tag">04 / Future Vision</span>
-            <h2 className="section-title">Future Scope – Project HelioBloom</h2>
-            <p style={{ color: '#888', fontSize: '1rem', maxWidth: 800, marginTop: 16 }}>
-              Most utility-scale solar farms today rely either on fixed-tilt photovoltaic panels or mechanised solar trackers. While mechanical trackers significantly improve energy production, their reliance on heavy motors, complex gears, linkages, and electronic actuators increases maintenance costs, introduces mechanical failure risks, and elevates operational complexity at a global scale.
+            <h2 className="section-title">Future Scope — Project HelioBloom</h2>
+            <p className="section-desc">
+              Most utility-scale solar farms today rely either on fixed-tilt
+              photovoltaic panels or mechanised solar trackers. While mechanical
+              trackers significantly improve energy production, their reliance on
+              heavy motors, complex gears, linkages, and electronic actuators
+              increases maintenance costs and operational complexity.
             </p>
           </div>
 
-          <div className="timeline" style={{ maxWidth: 800 }}>
-            {/* Sub 1 */}
+          <div className="timeline" style={{ maxWidth: 700 }}>
+            {/* Timeline Item 1 */}
             <div className="timeline-item active">
-              <h3 style={{ fontSize: '1.1rem', color: '#fff', marginBottom: 8 }}>Current Implemented Technology</h3>
-              <p style={{ color: '#bbb', fontSize: '0.95rem' }}>Modern solar power plants widely implement single-axis and dual-axis mechanical trackers to dynamically rotate photovoltaic panels, following the sun's trajectory throughout the day. Major global manufacturers such as Nextracker, Array Technologies, and Solar Steel produce the utility-scale tracking systems that currently dominate large solar infrastructure projects worldwide.</p>
+              <h3>Current Implemented Technology</h3>
+              <p style={{ color: "#888", fontSize: "0.9rem", lineHeight: 1.7 }}>
+                Modern solar power plants widely implement single-axis and
+                dual-axis mechanical trackers to dynamically rotate photovoltaic
+                panels, following the sun's trajectory throughout the day. Major
+                global manufacturers such as Nextracker, Array Technologies, and
+                Solar Steel produce the utility-scale tracking systems that
+                currently dominate large solar infrastructure projects worldwide.
+              </p>
             </div>
-            
-            {/* Sub 2 */}
+
+            {/* Timeline Item 2 */}
             <div className="timeline-item">
-              <h3 style={{ fontSize: '1.1rem', color: '#fff', marginBottom: 8 }}>Limitations of Fixed Solar Panels</h3>
-              <p style={{ color: '#bbb', fontSize: '0.95rem' }}>Fixed panels are fundamentally unable to continuously face the sun as it traverses the sky. Consequently, the angle of incidence between sunlight and the panel surface constantly fluctuates, drastically reducing effective irradiance and causing substantial energy losses due to the cosine effect. Experimental studies comparing fixed photovoltaic systems with active tracking systems have repeatedly demonstrated energy generation gains of nearly <span style={{ color: '#fff', fontWeight: 500 }}>15–40 percent</span> when tracking mechanisms are employed, quantitatively confirming that fixed layouts lose critical efficiency by failing to maintain optimal solar orientation.</p>
-              <div style={{ marginTop: 12, padding: 12, borderLeft: '2px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <p style={{ fontSize: '0.8rem', fontFamily: 'monospace', color: '#555', marginBottom: 4 }}>// SUPPORTING RESEARCH // Experimental tracking performance analyses</p>
-                <a href="https://academic.oup.com/ce/article/8/6/237/7889269" target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: '#fff', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.15)', textUnderlineOffset: 4 }}>1. Oxford Academic: Performance analysis of solar tracking systems</a>
-                <a href="https://voltageg.com/en/expert-blog/solar-tracker-vs-fixed-panel-europe/" target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: '#fff', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.15)', textUnderlineOffset: 4 }}>2. Voltage Expert Blog: Solar Tracker vs. Fixed Panel Yield Evaluation</a>
-                <a href="https://file.scirp.org/pdf/jpee_1771300.pdf" target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: '#fff', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.15)', textUnderlineOffset: 4 }}>3. SCIRP: Efficiency Comparison Between Fixed Tilt and Dual-Axis Tracking</a>
+              <h3>Limitations of Fixed Solar Panels</h3>
+              <p style={{ color: "#888", fontSize: "0.9rem", lineHeight: 1.7 }}>
+                Fixed panels are fundamentally unable to continuously face the
+                sun as it traverses the sky. The angle of incidence constantly
+                fluctuates, drastically reducing effective irradiance and causing
+                substantial energy losses due to the cosine effect. Studies have
+                demonstrated energy generation gains of nearly{" "}
+                <span style={{ color: "#fff", fontWeight: 500 }}>
+                  15–40 percent
+                </span>{" "}
+                when tracking mechanisms are employed.
+              </p>
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: "10px 14px",
+                  borderLeft: "2px solid rgba(245,158,11,0.2)",
+                  background: "rgba(245,158,11,0.02)",
+                  borderRadius: "0 8px 8px 0",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.72rem",
+                    fontFamily: "monospace",
+                    color: "#444",
+                    marginBottom: 2,
+                  }}
+                >
+                  // SUPPORTING RESEARCH
+                </p>
+                {[
+                  { url: "https://academic.oup.com/ce/article/8/6/237/7889269", text: "1. Oxford Academic: Performance analysis of solar tracking systems" },
+                  { url: "https://voltageg.com/en/expert-blog/solar-tracker-vs-fixed-panel-europe/", text: "2. Voltage Expert Blog: Solar Tracker vs. Fixed Panel Yield Evaluation" },
+                  { url: "https://file.scirp.org/pdf/jpee_1771300.pdf", text: "3. SCIRP: Efficiency Comparison Between Fixed Tilt and Dual-Axis" },
+                ].map((link, i) => (
+                  <a
+                    key={i}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      fontSize: "0.8rem",
+                      color: "#999",
+                      textDecoration: "underline",
+                      textDecorationColor: "rgba(255,255,255,0.08)",
+                      textUnderlineOffset: 3,
+                      transition: "color 0.2s",
+                    }}
+                  >
+                    {link.text}
+                  </a>
+                ))}
               </div>
             </div>
-            
-            {/* Sub 3 */}
+
+            {/* Timeline Item 3 */}
             <div className="timeline-item">
-              <h3 style={{ fontSize: '1.1rem', color: '#fff', marginBottom: 8 }}>Future Research Direction: Project HelioBloom</h3>
-              <p style={{ color: '#bbb', fontSize: '0.95rem', marginBottom: 16 }}>Project HelioBloom proposes a paradigm shift in solar architecture, drawing direct biomimicry inspiration from sunflower heliotropism. The concept visualises a central supporting hub anchoring multiple petal-shaped solar panels arranged radially. Each petal panel is mounted on a flexible rib or compliant structure designed to subtly adjust its orientation toward incident sunlight. Instead of relying on traditional electric servos, this research explores passive mechanical responses—such as thermal expansion joints, smart shape-memory materials, or engineered compliant mechanisms—to autonomously produce the micro-orientation adjustments necessary to optimise sunlight capture.</p>
-              <Image src="/assets/heliobloom_blueprint.png" alt="HelioBloom Engineering Blueprint" width={800} height={400} style={{ width: '100%', height: 'auto', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', marginTop: 8 }} />
+              <h3>Future Research Direction: Project HelioBloom</h3>
+              <p style={{ color: "#888", fontSize: "0.9rem", lineHeight: 1.7, marginBottom: 16 }}>
+                Project HelioBloom proposes a paradigm shift in solar
+                architecture, drawing direct biomimicry inspiration from
+                sunflower heliotropism. The concept visualises a central
+                supporting hub anchoring multiple petal-shaped solar panels
+                arranged radially, using passive mechanical responses — thermal
+                expansion joints, smart shape-memory materials, or engineered
+                compliant mechanisms — to autonomously optimise sunlight capture.
+              </p>
+              <Image
+                src="/assets/heliobloom_blueprint.png"
+                alt="HelioBloom Engineering Blueprint"
+                width={800}
+                height={400}
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              />
             </div>
-            
-            {/* Sub 4 */}
+
+            {/* Timeline Item 4 */}
             <div className="timeline-item" style={{ paddingBottom: 0 }}>
-              <h3 style={{ fontSize: '1.1rem', color: '#fff', marginBottom: 8 }}>Future Implementation in Solar Farms</h3>
-              <p style={{ color: '#bbb', fontSize: '0.95rem', marginBottom: 16 }}>If successfully developed and effectively scaled, the HelioBloom architecture could drastically reduce mechanical complexity across vast solar arrays. By eliminating thousands of moving motor components and their associated electronic controllers, the design promises to significantly decrease continuous maintenance requirements. This biomimicry-inspired modular design offers distinct advantages: lower baseline operational costs, improved long-term reliability through passive mechanical actuation, and a moderate but highly stable energy efficiency improvement over conventional fixed-panel installations.</p>
-              <Image src="/assets/heliobloom_material.jpg" alt="HelioBloom Material Close-up" width={800} height={400} style={{ width: '100%', height: 'auto', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', marginTop: 8 }} />
+              <h3>Future Implementation in Solar Farms</h3>
+              <p style={{ color: "#888", fontSize: "0.9rem", lineHeight: 1.7, marginBottom: 16 }}>
+                If successfully developed, the HelioBloom architecture could
+                drastically reduce mechanical complexity across vast solar
+                arrays. By eliminating thousands of moving motor components, the
+                design promises lower baseline operational costs, improved
+                long-term reliability through passive mechanical actuation, and
+                stable energy efficiency improvement over fixed-panel
+                installations.
+              </p>
+              <Image
+                src="/assets/heliobloom_material.jpg"
+                alt="HelioBloom Material Close-up"
+                width={800}
+                height={400}
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              />
             </div>
           </div>
-        </motion.div>
+        </div>
       </section>
 
+      {/* ─── FOOTER ─── */}
       <footer>
-        <p>vX.1 PROTOTYPE // OPEN SOURCE HARDWARE IMPLEMENTATION</p>
-        <p style={{ marginTop: 8, fontSize: '0.7rem' }}>© {new Date().getFullYear()} Ayaan Siddique. All Rights Reserved.</p>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            marginBottom: 8,
+          }}
+        >
+          <Sun size={12} color="#f59e0b" />
+          <p>vX.1 PROTOTYPE // OPEN SOURCE HARDWARE IMPLEMENTATION</p>
+        </div>
+        <p style={{ fontSize: "0.65rem" }}>
+          © {new Date().getFullYear()} Ayaan Siddique. All Rights Reserved.
+        </p>
       </footer>
     </main>
   );
